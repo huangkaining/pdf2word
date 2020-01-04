@@ -10,6 +10,9 @@ from pdfminer.layout import LAParams,LTTextBoxHorizontal
 from pdfminer.pdfpage import PDFTextExtractionNotAllowed,PDFPage
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
+import pytesseract
+from PIL import Image
+import sys, fitz, os, datetime
 
 class MainWindow(QMainWindow,Ui_MainWindow):
     def __init__(self,parent = None):
@@ -43,7 +46,13 @@ class MainWindow(QMainWindow,Ui_MainWindow):
                     #print(00)
                     textresult = pdf2TxtManager.changePdfToText(self.filePath,0)
                 self.TextResult.setText(textresult)
-
+            if self.ChoiceOCR.isChecked():
+                imagePath = 'temp'
+                if self.ChoiceWriteFile.isChecked():
+                    textresult = pyMuPDF_fitz(self.filePath, imagePath,1)
+                else:
+                    textresult = pyMuPDF_fitz(self.filePath, imagePath,0)
+                self.TextResult.setText(textresult)
 
 
 
@@ -102,6 +111,29 @@ class CPdf2TxtManager():
         finally:
             if file:
                 file.close()
+
+def pyMuPDF_fitz(pdfPath, imagePath,writeMethod):
+    pdfDoc = fitz.open(pdfPath)
+    for pg in range(pdfDoc.pageCount):
+        page = pdfDoc[pg]
+        rotate = int(0)
+        # 每个尺寸的缩放系数为1.3，这将为我们生成分辨率提高2.6的图像。
+        # 此处若是不做设置，默认图片大小为：792X612, dpi=96
+        zoom_x = 1.33333333 #(1.33333333-->1056x816)   (2-->1584x1224)
+        zoom_y = 1.33333333
+        mat = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
+        pix = page.getPixmap(matrix=mat, alpha=False)
+        if not os.path.exists(imagePath):#判断存放图片的文件夹是否存在
+            os.makedirs(imagePath) # 若图片文件夹不存在就创建
+        pix.writePNG(imagePath+'/'+pdfPath.split('/')[-1].split('.')[0]+'images_%s.png' % pg)#将图片写入指定的文件夹内
+    text_result = ""
+    for i in range(pdfDoc.pageCount):
+        img = Image.open(imagePath+'/'+pdfPath.split('/')[-1].split('.')[0]+'images_%s.png' % i)
+        s = pytesseract.image_to_string(img, lang='chi_sim')
+        text_result = text_result + s
+    return  text_result
+
+
 
 
 
