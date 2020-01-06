@@ -114,6 +114,7 @@ class CPdf2TxtManager():
 
 def pyMuPDF_fitz(pdfPath, imagePath,writeMethod):
     pdfDoc = fitz.open(pdfPath)
+    text_result = ""
     for pg in range(pdfDoc.pageCount):
         page = pdfDoc[pg]
         rotate = int(0)
@@ -125,12 +126,16 @@ def pyMuPDF_fitz(pdfPath, imagePath,writeMethod):
         pix = page.getPixmap(matrix=mat, alpha=False)
         if not os.path.exists(imagePath):#判断存放图片的文件夹是否存在
             os.makedirs(imagePath) # 若图片文件夹不存在就创建
-        pix.writePNG(imagePath+'/'+pdfPath.split('/')[-1].split('.')[0]+'images_%s.png' % pg)#将图片写入指定的文件夹内
-    text_result = ""
-    for i in range(pdfDoc.pageCount):
-        img = Image.open(imagePath+'/'+pdfPath.split('/')[-1].split('.')[0]+'images_%s.png' % i)
+        filename_tmp = imagePath+'/'+pdfPath.split('/')[-1].split('.')[0]+'images_%s.png' % pg
+        pix.writePNG(filename_tmp)#将图片写入指定的文件夹内
+        img = Image.open(filename_tmp)
         s = pytesseract.image_to_string(img, lang='chi_sim')
         text_result = text_result + s
+    '''for i in range(pdfDoc.pageCount):
+        img = Image.open(imagePath+'/'+pdfPath.split('/')[-1].split('.')[0]+'images_%s.png' % i)
+        s = pytesseract.image_to_string(img, lang='chi_sim')
+        text_result = text_result + s'''
+    pdfDoc.close()
     return  text_result
 
 
@@ -142,3 +147,12 @@ if __name__ == '__main__':
     w = MainWindow()
     w.show()
     sys.exit(app.exec())
+'''
+截图功能真心麻烦，先装pyhook3比pyhook麻烦太多
+需要先下swig
+会出现需要VC++ 14，这个找了半天才知道他还叫VC++ 2015
+然后通过微软的VC++ build tools 安装好vc++ 14
+然后pyhhok就可以使用了
+然后鼠标事件假如绑定所有事件会很卡，就绑定鼠标up和down会快很多
+ImageGrab在win10非100%缩放比如125%缩放的时候会有问题
+'''
