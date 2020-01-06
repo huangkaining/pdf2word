@@ -12,9 +12,18 @@ from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
 import pytesseract
 from PIL import Image
-import sys, fitz, os, datetime
+import sys, fitz, os, time
+from PIL import ImageGrab
+import PyHook3
+import pythoncom
+import win32gui
+import win32ui
+import win32con
+import win32print
+import ctypes
 
 class MainWindow(QMainWindow,Ui_MainWindow):
+    sig_getImage = pyqtSignal()
     def __init__(self,parent = None):
         super(MainWindow,self).__init__(parent)
         self.setupUi(self)
@@ -22,23 +31,28 @@ class MainWindow(QMainWindow,Ui_MainWindow):
         self.cwd = os.getcwd()
         self.filePath = ""
         self.ChoicePdfminer.setChecked(True)
+        self.myKBM = None
+
+        #绑定信号
+
 
         #绑定按钮
-        self.btnUploadFile.clicked.connect(self.Upload_File)
+        self.btnUploadFile.clicked.connect(self.UploadFile)
         self.btnAnalyse.clicked.connect(self.Analyse)
+        self.btnPrintScreen.clicked.connect(self.PrintScreen)
 
-    def Upload_File(self):
+    def UploadFile(self):#上传文件
         fileName_choose, filetype = QFileDialog.getOpenFileName(self,"选取文件",self.cwd,"All Files(*)")
         if fileName_choose == "":
             return
         self.filePath = fileName_choose
         self.LabelFile.setText(self.filePath)
 
-    def Analyse(self):
+    def Analyse(self):#分析pdf
         if not self.filePath:
             self.TextResult.setText("未选择文件")
         else:
-            if self.ChoicePdfminer.isChecked():
+            if self.ChoicePdfminer.isChecked():#使用pdfminer进行分析，抽出所有文件，适合于pdf是由文字构成的pdf
                 pdf2TxtManager = CPdf2TxtManager()
                 if self.ChoiceWriteFile.isChecked():
                     textresult = pdf2TxtManager.changePdfToText(self.filePath,1)
@@ -46,14 +60,34 @@ class MainWindow(QMainWindow,Ui_MainWindow):
                     #print(00)
                     textresult = pdf2TxtManager.changePdfToText(self.filePath,0)
                 self.TextResult.setText(textresult)
-            if self.ChoiceOCR.isChecked():
+            if self.ChoiceOCR.isChecked():#使用OCR进行分析，适合pdf内没有文字全是图片，例如书的扫描版
                 imagePath = 'temp'
                 if self.ChoiceWriteFile.isChecked():
-                    textresult = pyMuPDF_fitz(self.filePath, imagePath,1)
+                    textresult = pyMuPDF_fitz(self.filePath, imagePath,1)#需要生成同名txt
                 else:
-                    textresult = pyMuPDF_fitz(self.filePath, imagePath,0)
+                    textresult = pyMuPDF_fitz(self.filePath, imagePath,0)#不需要生成同名txt
                 self.TextResult.setText(textresult)
 
+    def PrintScreen(self):
+        ctypes.windll.user32.SetProcessDPIAware()
+        hm = PyHook3.HookManager()  # 注册监视器
+        self.sig_getImage.connect(self.PrintScreen_show)
+        self.myKBM = KeyBoardManger(hm,self.sig_getImage)  # 定义自己的类
+        self.myKBM.hm.MouseLeftDown = self.myKBM.getOld  # 绑定方法
+        self.myKBM.hm.MouseLeftUp = self.myKBM.getNew # 绑定的鼠标事件只要绑定自己要的事件就行，网上教程的做法卡到爆炸,这里是绑定了鼠标左键按下去，弹起来
+        self.myKBM.hm.HookMouse()  # 开始监听鼠标
+        #pythoncom.PumpMessages()  # 在pyqt情况下不需要循环
+
+        #imagePath = 'temp'
+        #temp_name = str(hash(time.time()))
+        #if not os.path.exists(imagePath):#判断存放图片的文件夹是否存在
+         #   os.makedirs(imagePath) # 若图片文件夹不存在就创建
+        #myKBM.getImage().save(imagePath + '/' + temp_name + '.jpg','JPEG')
+
+
+    def PrintScreen_show(self):
+        textresult = pytesseract.image_to_string(self.myKBM.getImage(), lang='chi_sim')
+        self.TextResult.setText(textresult)
 
 
 class CPdf2TxtManager():
@@ -138,8 +172,63 @@ def pyMuPDF_fitz(pdfPath, imagePath,writeMethod):
     pdfDoc.close()
     return  text_result
 
+class KeyBoardManger():
+    def __init__(self,hm,sig):#初始化前后坐标
+        self.x_old = 0
+        self.y_old = 0
+        self.x_new = 0
+        self.y_new = 0
+        self.image = None
+        #self.dpi = self.getDPI()
+        self.dpi = 1
+        self.hm = hm
+        self.sig = sig
 
+    def getOld(self,event):#获取鼠标开始位置
+        self.x_old = event.Position[0]*self.dpi
+        self.y_old = event.Position[1]*self.dpi
+        return True
 
+    def getNew(self,event):#获取鼠标结束位置
+        #print(event.Position[0])
+        #print(event.Position[1])
+        self.x_new = event.Position[0]*self.dpi
+        self.y_new = event.Position[1]*self.dpi
+        self.hm.UnhookMouse()#解绑监听
+        self.image = ImageGrab.grab((self.x_old,self.y_old,self.x_new,self.y_new))#截图
+        #self.image = ImageGrab.grab((0,0,1920*self.dpi,1080*self.dpi))  # 截图
+        #print(0,0,1920/self.dpi,1080/self.dpi)
+        #print(self.dpi)
+        #print(self.x_old,self.y_old,self.x_new,self.y_new)
+        self.image.show()
+        self.sig.emit()
+        self.hm = None
+        return True
+
+    def getDPI(self):#获取win10的缩放比例
+        '''
+        win10的缩放比例设置比较奇怪
+        根据网上资料高级自定义缩放和默认缩放不一致，需要设置两个参数，比较后返回
+        当用户使用默认方法设置缩放时，应该使用GetDeviceCaps(DESKTOPHORZRES)/GetDeviceCaps(HORZRES)获得缩放比例
+        当用户使用高级模式中的自定义缩放时，应该使用GetDeviceCaps(LOGPIXELSX)再除以0.96（再除以100，因为算出来的数字是百分比）
+
+        该方法待研究，Image.crop方法似乎在非100%缩放情况下无法直接正常工作，留待后续研究，使用ctypes.windll.user32.SetProcessDPIAware()暂时处理
+
+        '''
+        hDC = win32gui.GetDC(0)
+        dpiA = win32print.GetDeviceCaps(hDC, win32con.DESKTOPHORZRES) / win32print.GetDeviceCaps(hDC, win32con.HORZRES)
+        dpiB = win32print.GetDeviceCaps(hDC, win32con.LOGPIXELSX) / 0.96 / 100
+        if dpiA == 1:
+            return dpiB
+        elif dpiB == 1:
+            return dpiA
+        elif dpiA == dpiB:
+            return dpiA
+        else:
+            return None
+
+    def getImage(self):
+        return self.image
 
 
 if __name__ == '__main__':

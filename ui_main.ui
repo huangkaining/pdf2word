@@ -149,7 +149,7 @@
     <property name="title">
      <string>截屏转换</string>
     </property>
-    <widget class="QPushButton" name="btn">
+    <widget class="QPushButton" name="btnPrintScreen">
      <property name="geometry">
       <rect>
        <x>10</x>
@@ -159,7 +159,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>PushButton</string>
+      <string>截屏转换</string>
      </property>
     </widget>
    </widget>
