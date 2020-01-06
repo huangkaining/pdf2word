@@ -53,13 +53,26 @@ class MainWindow(QMainWindow,Ui_MainWindow):
             self.TextResult.setText("未选择文件")
         else:
             if self.ChoicePdfminer.isChecked():#使用pdfminer进行分析，抽出所有文件，适合于pdf是由文字构成的pdf
-                pdf2TxtManager = CPdf2TxtManager()
-                if self.ChoiceWriteFile.isChecked():
-                    textresult = pdf2TxtManager.changePdfToText(self.filePath,1)
-                else:
-                    #print(00)
-                    textresult = pdf2TxtManager.changePdfToText(self.filePath,0)
-                self.TextResult.setText(textresult)
+                #pdf2TxtManager = CPdf2TxtManager()
+                if self.ChoiceWriteFile.isChecked():#生成同名txt
+                    self.apthread = AnalysePdfminerThread()
+                    self.apthread.setMethod(1)
+                    self.apthread.setFilePath(self.filePath)
+                    self.apthread.sig_start.connect(self.showStatue)
+                    self.apthread.sig_finish.connect(self.showStatue)
+                    self.apthread.sig_textResultPdfminer.connect(self.showResult)
+                    self.apthread.start()
+                    #textresult = pdf2TxtManager.changePdfToText(self.filePath,1)
+                else:#不生成同名txt
+                    self.apthread = AnalysePdfminerThread()
+                    self.apthread.setMethod(0)
+                    self.apthread.setFilePath(self.filePath)
+                    self.apthread.sig_start.connect(self.showStatue)
+                    self.apthread.sig_finish.connect(self.showStatue)
+                    self.apthread.sig_textResultPdfminer.connect(self.showResult)
+                    self.apthread.start()
+                    #textresult = pdf2TxtManager.changePdfToText(self.filePath,0)
+                #self.TextResult.setText(textresult)
             if self.ChoiceOCR.isChecked():#使用OCR进行分析，适合pdf内没有文字全是图片，例如书的扫描版
                 imagePath = 'temp'
                 if self.ChoiceWriteFile.isChecked():
@@ -88,6 +101,16 @@ class MainWindow(QMainWindow,Ui_MainWindow):
     def PrintScreen_show(self):
         textresult = pytesseract.image_to_string(self.myKBM.getImage(), lang='chi_sim')
         self.TextResult.setText(textresult)
+
+    def showResult(self,textresult):
+        print('get result')
+        self.TextResult.setText(textresult)
+
+    def showStatue(self,Tstatue):
+        if Tstatue == 1:
+            self.statuelabel.setText("开始分析")
+        elif Tstatue == 2:
+            self.statuelabel.setText("分析结束")
 
 
 class CPdf2TxtManager():
@@ -230,6 +253,27 @@ class KeyBoardManger():
     def getImage(self):
         return self.image
 
+class AnalysePdfminerThread(QThread):#使用pdf分析的子线程
+    sig_textResultPdfminer = pyqtSignal(str)    #返回结果
+    sig_start = pyqtSignal(int)     #开始信号
+    sig_finish = pyqtSignal(int)    #结束信号
+    def __init__(self):
+        super(AnalysePdfminerThread,self).__init__()
+        self.writeMethod = 0
+        self.filePath = ''
+
+    def run(self):
+        self.sig_start.emit(1)
+        pdf2TxtManager = CPdf2TxtManager()
+        textresult = pdf2TxtManager.changePdfToText(self.filePath, self.writeMethod)#转换
+        self.sig_textResultPdfminer.emit(textresult)#返回结果
+        self.sig_finish.emit(2)
+
+    def setMethod(self,writeMethod):
+        self.writeMethod = writeMethod
+
+    def setFilePath(self,filePath):
+        self.filePath = filePath
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
