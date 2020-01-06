@@ -54,32 +54,32 @@ class MainWindow(QMainWindow,Ui_MainWindow):
         else:
             if self.ChoicePdfminer.isChecked():#使用pdfminer进行分析，抽出所有文件，适合于pdf是由文字构成的pdf
                 #pdf2TxtManager = CPdf2TxtManager()
+                self.apThread = AnalysePdfminerThread()#产生线程
                 if self.ChoiceWriteFile.isChecked():#生成同名txt
-                    self.apthread = AnalysePdfminerThread()
-                    self.apthread.setMethod(1)
-                    self.apthread.setFilePath(self.filePath)
-                    self.apthread.sig_start.connect(self.showStatue)
-                    self.apthread.sig_finish.connect(self.showStatue)
-                    self.apthread.sig_textResultPdfminer.connect(self.showResult)
-                    self.apthread.start()
+                    self.apThread.setMethod(1)
                     #textresult = pdf2TxtManager.changePdfToText(self.filePath,1)
                 else:#不生成同名txt
-                    self.apthread = AnalysePdfminerThread()
-                    self.apthread.setMethod(0)
-                    self.apthread.setFilePath(self.filePath)
-                    self.apthread.sig_start.connect(self.showStatue)
-                    self.apthread.sig_finish.connect(self.showStatue)
-                    self.apthread.sig_textResultPdfminer.connect(self.showResult)
-                    self.apthread.start()
+                    self.apThread.setMethod(0)
+                self.apThread.setFilePath(self.filePath)    #设置pdf文件路径
+                self.apThread.sig_start.connect(self.showStatue)    #开始信号
+                self.apThread.sig_finish.connect(self.showStatue)   #结束信号
+                self.apThread.sig_textResultPdfminer.connect(self.showResult)   #返回结果
+                self.apThread.start()
                     #textresult = pdf2TxtManager.changePdfToText(self.filePath,0)
                 #self.TextResult.setText(textresult)
             if self.ChoiceOCR.isChecked():#使用OCR进行分析，适合pdf内没有文字全是图片，例如书的扫描版
-                imagePath = 'temp'
+                #imagePath = 'temp'
+                self.aoThread = AnalyseOCRThread()
                 if self.ChoiceWriteFile.isChecked():
-                    textresult = pyMuPDF_fitz(self.filePath, imagePath,1)#需要生成同名txt
+                    self.aoThread.setMethod(1)  #生成同名txt
                 else:
-                    textresult = pyMuPDF_fitz(self.filePath, imagePath,0)#不需要生成同名txt
-                self.TextResult.setText(textresult)
+                    self.aoThread.setMethod(0)  #不生成同名txt
+                self.aoThread.setFilePath(self.filePath)
+                self.aoThread.setImagePath('temp')
+                self.aoThread.sig_start.connect(self.showStatue)
+                self.aoThread.sig_finish.connect(self.showStatue)
+                self.aoThread.sig_textResultOCR.connect(self.showResult)
+                self.aoThread.start()
 
     def PrintScreen(self):
         ctypes.windll.user32.SetProcessDPIAware()
@@ -103,7 +103,6 @@ class MainWindow(QMainWindow,Ui_MainWindow):
         self.TextResult.setText(textresult)
 
     def showResult(self,textresult):
-        print('get result')
         self.TextResult.setText(textresult)
 
     def showStatue(self,Tstatue):
@@ -274,6 +273,31 @@ class AnalysePdfminerThread(QThread):#使用pdf分析的子线程
 
     def setFilePath(self,filePath):
         self.filePath = filePath
+
+class AnalyseOCRThread(QThread):#使用pdf分析的子线程
+    sig_textResultOCR = pyqtSignal(str)    #返回结果
+    sig_start = pyqtSignal(int)     #开始信号
+    sig_finish = pyqtSignal(int)    #结束信号
+    def __init__(self):
+        super(AnalyseOCRThread,self).__init__()
+        self.writeMethod = 0
+        self.filePath = ''
+        self.imagePath = ''
+
+    def run(self):
+        self.sig_start.emit(1)
+        textresult = pyMuPDF_fitz(self.filePath, self.imagePath,self.writeMethod)#转换
+        self.sig_textResultOCR.emit(textresult)#返回结果
+        self.sig_finish.emit(2)
+
+    def setMethod(self,writeMethod):
+        self.writeMethod = writeMethod
+
+    def setFilePath(self,filePath):
+        self.filePath = filePath
+
+    def setImagePath(self,imagepath):
+        self.imagePath = imagepath
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
