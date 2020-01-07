@@ -99,13 +99,20 @@ class MainWindow(QMainWindow,Ui_MainWindow):
 
 
     def PrintScreen_show(self): #与PrintScreen方法，KeyBoardManger类 配合
+        print(2)
         self.psThread = PrintScreenThread(self.myKBM.getImage())
+        print(13)
         #textresult = pytesseract.image_to_string(self.myKBM.getImage(), lang='chi_sim')
         self.psThread.sig_start.connect(self.showStatue)
+        print(10)
         self.psThread.sig_finish.connect(self.showStatue)
+        print(11)
         self.psThread.sig_textResultOCR.connect(self.showResult)
+        print(12)
         self.psThread.start()
+        print(3)
         self.showStatue(3)
+        self.psThread.wait()
 
 
     def showResult(self,textresult):#展示结果
@@ -225,15 +232,19 @@ class KeyBoardManger():
         self.x_new = event.Position[0]*self.dpi
         self.y_new = event.Position[1]*self.dpi
         self.hm.UnhookMouse()#解绑监听
+        self.hm.UnhookKeyboard()
         self.image = ImageGrab.grab((self.x_old,self.y_old,self.x_new,self.y_new))#截图
         #self.image = ImageGrab.grab((0,0,1920*self.dpi,1080*self.dpi))  # 截图
         #print(0,0,1920/self.dpi,1080/self.dpi)
         #print(self.dpi)
         #print(self.x_old,self.y_old,self.x_new,self.y_new)
         #self.image.show()
-        self.sig.emit()
+        print(1111)
         self.hm = None
+        self.sig.emit()
+
         return True
+        #return False
 
     def getDPI(self):#获取win10的缩放比例
         '''
