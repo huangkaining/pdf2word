@@ -98,11 +98,17 @@ class MainWindow(QMainWindow,Ui_MainWindow):
         #myKBM.getImage().save(imagePath + '/' + temp_name + '.jpg','JPEG')
 
 
-    def PrintScreen_show(self):
-        textresult = pytesseract.image_to_string(self.myKBM.getImage(), lang='chi_sim')
-        self.TextResult.setText(textresult)
+    def PrintScreen_show(self): #与PrintScreen方法，KeyBoardManger类 配合
+        self.psThread = PrintScreenThread(self.myKBM.getImage())
+        #textresult = pytesseract.image_to_string(self.myKBM.getImage(), lang='chi_sim')
+        self.psThread.sig_start.connect(self.showStatue)
+        self.psThread.sig_finish.connect(self.showStatue)
+        self.psThread.sig_textResultOCR.connect(self.showResult)
+        self.psThread.start()
+        self.showStatue(3)
 
-    def showResult(self,textresult):
+
+    def showResult(self,textresult):#展示结果
         self.TextResult.setText(textresult)
 
     def showStatue(self,Tstatue):
@@ -110,6 +116,8 @@ class MainWindow(QMainWindow,Ui_MainWindow):
             self.statuelabel.setText("开始分析")
         elif Tstatue == 2:
             self.statuelabel.setText("分析结束")
+        elif Tstatue == 3:
+            self.statuelabel.setText("截图完成")
 
 
 class CPdf2TxtManager():
@@ -222,7 +230,7 @@ class KeyBoardManger():
         #print(0,0,1920/self.dpi,1080/self.dpi)
         #print(self.dpi)
         #print(self.x_old,self.y_old,self.x_new,self.y_new)
-        self.image.show()
+        #self.image.show()
         self.sig.emit()
         self.hm = None
         return True
@@ -298,6 +306,22 @@ class AnalyseOCRThread(QThread):#使用pdf分析的子线程
 
     def setImagePath(self,imagepath):
         self.imagePath = imagepath
+
+class PrintScreenThread(QThread):   #使用截图分析的子线程
+    sig_textResultOCR = pyqtSignal(str)  # 返回结果
+    sig_start = pyqtSignal(int)  # 开始信号
+    sig_finish = pyqtSignal(int)  # 结束信号
+
+    def __init__(self,rawImage):
+        super(PrintScreenThread, self).__init__()
+        self.rawImage = rawImage
+
+    def run(self):
+        self.sig_start.emit(1)
+        textresult = pytesseract.image_to_string(self.rawImage, lang='chi_sim') #用pytesseract进行分析
+        self.sig_textResultOCR.emit(textresult)  # 返回结果
+        self.sig_finish.emit(2)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
