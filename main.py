@@ -84,7 +84,7 @@ class MainWindow(QMainWindow,Ui_MainWindow):
     def PrintScreen(self):
         ctypes.windll.user32.SetProcessDPIAware()
         hm = PyHook3.HookManager()  # 注册监视器
-        self.sig_getImage.connect(self.PrintScreen_show)
+        self.sig_getImage.connect(self.PrintScreenShow)
         self.myKBM = KeyBoardManger(hm,self.sig_getImage)  # 定义自己的类
         self.myKBM.hm.MouseLeftDown = self.myKBM.getOld  # 绑定方法
         self.myKBM.hm.MouseLeftUp = self.myKBM.getNew # 绑定的鼠标事件只要绑定自己要的事件就行，网上教程的做法卡到爆炸,这里是绑定了鼠标左键按下去，弹起来
@@ -97,22 +97,24 @@ class MainWindow(QMainWindow,Ui_MainWindow):
          #   os.makedirs(imagePath) # 若图片文件夹不存在就创建
         #myKBM.getImage().save(imagePath + '/' + temp_name + '.jpg','JPEG')
 
-
-    def PrintScreen_show(self): #与PrintScreen方法，KeyBoardManger类 配合
-        print(2)
+    #@pyqtSlot()
+    def PrintScreenShow(self): #与PrintScreen方法，KeyBoardManger类 配合
+        self.sig_getImage.disconnect(self.PrintScreenShow)
+        #print(2)
         self.psThread = PrintScreenThread(self.myKBM.getImage())
-        print(13)
+        #print(13)
         #textresult = pytesseract.image_to_string(self.myKBM.getImage(), lang='chi_sim')
         self.psThread.sig_start.connect(self.showStatue)
-        print(10)
+        #print(10)
         self.psThread.sig_finish.connect(self.showStatue)
-        print(11)
+        #print(11)
         self.psThread.sig_textResultOCR.connect(self.showResult)
-        print(12)
+        #print(12)
         self.psThread.start()
-        print(3)
+        #print(3)
         self.showStatue(3)
-        self.psThread.wait()
+
+        #self.psThread.wait()
 
 
     def showResult(self,textresult):#展示结果
@@ -239,9 +241,9 @@ class KeyBoardManger():
         #print(self.dpi)
         #print(self.x_old,self.y_old,self.x_new,self.y_new)
         #self.image.show()
-        print(1111)
         self.hm = None
         self.sig.emit()
+        #print(1111)
 
         return True
         #return False
